@@ -1,6 +1,7 @@
 using System;
 using System.Diagnostics;
 using System.IO;
+using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
@@ -9,6 +10,7 @@ using System.Xml.Linq;
 using System.Xml.Serialization;
 using static System.Net.WebRequestMethods;
 using static System.Windows.Forms.LinkLabel;
+using static System.Windows.Forms.VisualStyles.VisualStyleElement;
 
 namespace FileManager_1._0
 {
@@ -17,7 +19,6 @@ namespace FileManager_1._0
         // // // Initialization part // // //
         private const string discCfilePath = "discCdataBase.xml";
         private const string discDfilePath = "discDdataBase.xml";
-        private Folder myFolder; 
         Tuple<TreeNode, Folder> TreeViewInitRecFunction(XmlTextReader xmlReader, TreeNode myNode, Folder myFolder)
         {
             // Аналіз мого документа за допомогую SAX (бо мені не треба нічого знаходити,
@@ -73,29 +74,12 @@ namespace FileManager_1._0
             }
             return Tuple.Create(myNode, myFolder); // повертаю одразу два параметри
         }
-        private int openOrcloseFolder(List<Tuple<bool, string>> openFolder, int i, TreeNodeCollection Nodes)
-        {
-            foreach (TreeNode _node in Nodes)
-            {
-                if (openFolder.Count - 1 < i)
-                    return 0;
-                if (openFolder[i].Item2 == _node.Text)
-                {
-                    if (openFolder[i].Item1)
-                        _node.Expand();
-                    else
-                        _node.Collapse();
-                    i = openOrcloseFolder(openFolder, ++i, _node.Nodes);
-                }
-            }
-            return i;
-        }
-        void TreeViewInitialization(string filePath, TreeView treeView)
+        void TreeViewInitialization(string filePath, System.Windows.Forms.TreeView treeView)
         {
             //Для перевірки на відкритість\закритість папок
             List<Tuple<bool, string>> openFolder;
             if (treeView.Nodes.Count != 0)
-                openFolder = openFolderCheck(treeView.Nodes);
+                openFolder = HelperClass.OpenFolderCheck(treeView.Nodes);
             else
                 openFolder = new List<Tuple<bool, string>>();
             //
@@ -108,14 +92,14 @@ namespace FileManager_1._0
                 var tupleForTree = TreeViewInitRecFunction(xmlReader, null, null);
                 treeView.Nodes.Add(tupleForTree.Item1);
 
-                myFolder = tupleForTree.Item2;
-
+                //myFolder = tupleForTree.Item2;
                 xmlReader.Close();
             }
 
             //Для перевірки на відкритість\закритість папок
             if (openFolder.Count != 0)
-                openOrcloseFolder(openFolder, 0, treeView.Nodes);
+                HelperClass.OpenOrCloseFolder(openFolder, 0, treeView.Nodes);
+            //
         }
         // // // 
         public FileManagerForm()
@@ -125,25 +109,9 @@ namespace FileManager_1._0
             TreeViewInitialization(discDfilePath, treeViewRight);
 
         }
+
         // // // ListView Filling (after selecting some TreeView item) // // //
-        private string xPathFinding(TreeNode myNode, string concreteItem)
-        {
-            // Динамічно формую xPath, через проблему повторюванних імен
-            if (myNode == null)
-            {
-                MessageBox.Show("ERROR_1:xPathFindingFunction");
-                return null;
-            }
-            string xPath = "/folder[@FOLDER = '" + myNode.Text + "']" + concreteItem;
-            while (myNode.Parent != null)
-            {
-                xPath = xPath.Insert(0, "/folder[@FOLDER = '" + myNode.Parent.Text + "']");
-                myNode = myNode.Parent;
-            }
-            xPath = xPath.Insert(0, "/dataBase");
-            return xPath;
-        }
-        private void listViewFilling(ListView listView, TreeView treeView, string filePath)
+        private void listViewFilling(System.Windows.Forms.ListView listView, System.Windows.Forms.TreeView treeView, string filePath)
         {
             // За допомогою DOM та xPath відбираю усі ноди (тобо текстові файли),
             // що лежать у тій самій папці, на яку тикнули (текстові файли дочірніх
@@ -154,7 +122,7 @@ namespace FileManager_1._0
             XmlDocument xml = new XmlDocument();
             xml.Load(filePath);
             var myNode = treeView.SelectedNode;
-            string xpath = xPathFinding(myNode, "/document");
+            string xpath = HelperClass.xPathFinding(myNode, "/document");
             if (xpath == null)
             {
                 MessageBox.Show("ERROR_2:listViewFillingFunction");
@@ -227,113 +195,13 @@ namespace FileManager_1._0
             if (errorCheck(e.Node, "ERROR4.1:treeViewRight_BeforeCollapseFunction"))
                 closeFolder(e.Node);
         }
-        
-        // // // Some HELPER functions // // //
-        private XmlElement CreateXmlElement(XmlDocument xml, string itemType, string itemAttrType, string itemAttrText)
-        {
-            XmlElement newItem = xml.CreateElement(itemType);
-            try
-            {
-                XmlAttribute itemAttr = xml.CreateAttribute(itemAttrType);
-                XmlText nameText = xml.CreateTextNode(itemAttrText);
-                itemAttr.AppendChild(nameText);
-                newItem.Attributes.Append(itemAttr);
-            }
-            catch (Exception e)
-            {
-                MessageBox.Show("ERROR6:CreateXmlElement-function");
-            }
-            return newItem;
-        }
-        private Tuple<XmlDocument, XmlElement> updateDocRecFunc(XmlDocument xDoc, XmlElement myElem, Folder copiedItem)
-        {
-            foreach (Component comp in copiedItem.Get())
-            {
-                if (comp is Folder)
-                {
-                    var newFolder = CreateXmlElement(xDoc, "folder", "FOLDER", comp.Name);
-                    newFolder.InnerText = "";
-                    myElem.AppendChild(updateDocRecFunc(xDoc, newFolder, (Folder)comp).Item2);
-                }
-                else if(comp is File)
-                {
-                    var newFile = CreateXmlElement(xDoc, "document", "DOCUMENT", comp.Name);
-                    newFile.InnerText = "";
-                    myElem.AppendChild(newFile);
-                }
-            }
 
-            return Tuple.Create(xDoc, myElem);
-        }
-        private void updateDoc(TreeNode newHomeTreeNode, string filePath)
-        {
-            XmlDocument xDoc = new XmlDocument();
-            xDoc.Load(filePath);
-
-            string xpath = xPathFinding(newHomeTreeNode, "");
-            if (xpath == null)
-            {
-                MessageBox.Show("ERROR7:updateDoc-function");
-                return;
-            }
-            var newHomeNode = xDoc.SelectSingleNode(xpath);
-            if (copiedItem is Folder)
-            {
-                var newFolder = CreateXmlElement(xDoc, "folder", "FOLDER", copiedItem.Name);
-                var res = updateDocRecFunc(xDoc, newFolder, (Folder)copiedItem);
-                newHomeNode.AppendChild(res.Item2);
-            }
-            else if (copiedItem is File)
-            {
-                var newFile = CreateXmlElement(xDoc, "document", "DOCUMENT", copiedItem.Name);
-                newHomeNode.AppendChild(newFile);
-
-            }
-            xDoc.Save(filePath);
-        }
-        private List<Tuple<bool, string>> openFolderCheck(TreeNodeCollection Nodes)
-        {
-            List<Tuple<bool, string>> openFolder = new List<Tuple<bool, string>>();
-            
         // // // ComboBox functions // // //
-        TreeView comboTreeView;
-        ListView comboListView;
-        private void findTreeViewNode(TreeNodeCollection Nodes, string[] myNodes, int i)
-        {
-            foreach (TreeNode _node in Nodes)
-            {
-                if (i > myNodes.Length-1)
-                    return;
-                if (_node.Text == myNodes[i])
-                {
-                    _node.Expand();
-                    comboTreeView.SelectedNode = _node;
-                    findTreeViewNode(_node.Nodes, myNodes, ++i);
-                }
-            }
-        }
-        private void selectListViewItem(string myNodeName)
-        {
-            int p = -1;
-            foreach (ListViewItem _item in comboListView.Items)
-            {
-                if (_item.Text == myNodeName)
-                    p = _item.Index;
-            }
-            if (p > -1)
-            {
-                comboListView.Items[p].Focused = true;
-                comboListView.Items[p].Selected = true;
-                comboListView.Items[p].EnsureVisible();
-                comboListView.Select();
-            }
-
-        }
-        private void findNode(string link)
+        private void FindAndSelectListViewNode(string link,System.Windows.Forms.TreeView treeView, System.Windows.Forms.ListView listView)
         {
             var myNodes = link.Split('\\');
-            findTreeViewNode(comboTreeView.Nodes, myNodes, 0);
-            selectListViewItem(myNodes[myNodes.Length - 1]);
+            HelperClass.FindAndOpenTreeViewNode(treeView.Nodes, myNodes, 0, treeView);
+            HelperClass.SelectListViewItem(myNodes[myNodes.Length - 1], listView);
         }
         private void comboBoxClick(KeyPressEventArgs e, string comboBoxText, string _comboBox)
         {
@@ -341,17 +209,13 @@ namespace FileManager_1._0
             {
                 if (_comboBox == "LEFT")
                 {
-                    comboTreeView = treeViewLeft;
-                    comboListView = listViewLeft;
-                    findNode(comboBoxText);
+                    FindAndSelectListViewNode(comboBoxText,treeViewLeft,listViewLeft);
                     comboBoxLeftLink.Items.Add(comboBoxText);
 
                 }
                 else if (_comboBox == "RIGHT")
                 {
-                    comboTreeView = treeViewRight;
-                    comboListView = listViewRight;
-                    findNode(comboBoxText);
+                    FindAndSelectListViewNode(comboBoxText, treeViewRight, listViewRight);
                     comboBoxRightLink.Items.Add(comboBoxText);
                 }
                 else
@@ -373,8 +237,6 @@ namespace FileManager_1._0
         {
             if (selectedItem != null)
                 this.selectedItem = selectedItem;
-            //else
-                //MessageBox.Show("ERROR7: selectedItemSelect-function");
         }
         private void treeViewLeft_AfterSelect(object sender, TreeViewEventArgs e)
         {
@@ -428,8 +290,8 @@ namespace FileManager_1._0
         }
         
         // // // COPY: check, weather copy was correct // // //
-        Component copiedItem;
-        string oldFolderNodePath;
+        private Component copiedItem;
+        private string oldFolderNodePath;
         private void copyClick()
         {
             if (selectedItem == null || selectedItem.Item1 == null)
@@ -437,6 +299,7 @@ namespace FileManager_1._0
                 MessageBox.Show("Select something");
                 return;
             }
+            
             copiedItem = selectedItem.Item1;
             oldFolderNodePath = newFolderNodePath;
 
@@ -446,10 +309,13 @@ namespace FileManager_1._0
             copyClick();
         }
         // // // CUT: // // //
+        private bool isCutted = false;
+        private Tuple<List<Component>, string> removedItem;
         private void cutClick()
         {
+            isCutted = true;
             copyClick();
-            removeClick();
+            removedItem = Tuple.Create( new List<Component>() { selectedItem.Item1 }, selectedItem.Item2);
         }
         private void cutToolStripMenuItem_Click(object sender, EventArgs e)
         {
@@ -457,6 +323,30 @@ namespace FileManager_1._0
         }
 
         // // // PASTE:  // // //
+        private List<Tuple<string, string>> FindAllFilesReferences(Folder copiedFolder, string folderName)
+        {
+            List<Tuple<string, string>> filePathList = new List<Tuple<string, string>>();// <[source of the coppied file],[destination of the coppied file]>
+            foreach (Component _comp in copiedFolder.Get())
+            {
+                if (_comp is Folder)
+                    filePathList.AddRange(FindAllFilesReferences((Folder)_comp, folderName + _comp.Name + "_"));
+                else
+                    filePathList.Add(Tuple.Create("Files\\" + HelperClass.NewFileName(oldFolderNodePath) + "_" + folderName + _comp.Name, "Files\\" + HelperClass.NewFileName(newFolderNodePath) + "_" + copiedItem.Name + "_" + folderName + _comp.Name));
+            }
+            return filePathList;
+        }
+        private List<Component> FindAllFiles(Folder folder)
+        {
+            List<Component> files = new List<Component>();
+            foreach (Component _comp in folder.Get())
+            {
+                if (_comp is Folder)
+                    files.AddRange(FindAllFiles((Folder)_comp));
+                else
+                    files.Add((File)_comp);
+            }
+            return files;
+        }
         private void pasteClick()
         {
             if (selectedItem.Item1 is File)
@@ -465,21 +355,64 @@ namespace FileManager_1._0
                 return;
             }
 
-            TreeView treeView = selectedItem.Item2 == "LEFT" ? treeViewLeft : treeViewRight;
+            System.Windows.Forms.TreeView treeView = selectedItem.Item2 == "LEFT" ? treeViewLeft : treeViewRight;
             var discFilePath = selectedItem.Item2 == "LEFT" ? discCfilePath : discDfilePath;
             var listView = selectedItem.Item2 == "LEFT" ? listViewLeft : listViewRight;
-            Folder newHome = (Folder)selectedItem.Item1;
             string oldName = copiedItem.Name;
-            theSameNameCheck(treeView.SelectedNode, listView);
+
+
+            if (treeView.SelectedNode == null)
+            {
+                MessageBox.Show("Please, select folder with the desired file again");
+                return;
+            }
+            copiedItem.Name = HelperClass.TheSameNameCheck((Folder)treeView.SelectedNode.Tag, copiedItem.Name, copiedItem);
             string newName = copiedItem.Name;
-            newHome.Add(copiedItem);
-            updateDoc(treeView.SelectedNode, discFilePath);
+            // updating xml
+            string xpath = HelperClass.xPathFinding(treeView.SelectedNode, "");
+            if (xpath == null)
+            {
+                MessageBox.Show("ERROR7:updateDoc-function");
+                return;
+            }
+            XmlHelper.updateDoc(xpath, discFilePath,copiedItem);
+            //
             TreeViewInitialization(discFilePath, treeView);
             if (copiedItem is File)
             {
                 listView.Items.Add(copiedItem.Name);
-                //System.IO.File.Create("Files\\" + nameFormFunc(newFolderNodePath) + "_" + newName).Close();
-                System.IO.File.Copy("Files\\" + nameFormFunc(oldFolderNodePath) + "_" + oldName, "Files\\" + nameFormFunc(newFolderNodePath) + "_" + newName);
+                System.IO.File.Copy("Files\\" + HelperClass.NewFileName(oldFolderNodePath) + "_" + oldName, "Files\\" + HelperClass.NewFileName(newFolderNodePath) + "_" + newName);
+                if (isCutted)
+                {
+                    isCutted = false;
+                    var oldDiscFilePath = removedItem.Item2 == "LEFT" ? discCfilePath : discDfilePath;
+                    var oldTreeView = removedItem.Item2 == "LEFT" ? treeViewLeft : treeViewRight;
+                    var oldListView = removedItem.Item2 == "LEFT" ? listViewLeft : listViewRight;
+                    RemoveItem(removedItem.Item1[0], oldTreeView, oldListView, oldDiscFilePath);
+                }
+            }
+            else if (copiedItem is Folder)
+            {
+                List<Tuple<string, string>> filePathList;
+
+                filePathList = FindAllFilesReferences((Folder)copiedItem, string.Empty);
+                foreach (var _item in filePathList)
+                {
+                    System.IO.File.Copy(_item.Item1, _item.Item2);
+                }
+
+                if (isCutted)
+                {
+                    isCutted = false;
+                    var oldDiscFilePath = removedItem.Item2 == "LEFT" ? discCfilePath : discDfilePath;
+                    var oldTreeView = removedItem.Item2 == "LEFT" ? treeViewLeft : treeViewRight;
+                    var oldListView = removedItem.Item2 == "LEFT" ? listViewLeft : listViewRight;
+                    int i = 0;
+                    //foreach (var _item in filePathList)
+                    {
+                        RemoveItem(removedItem.Item1[i++], oldTreeView, oldListView, oldDiscFilePath);
+                    }
+                }
             }
         }
         private void pasteToolStripMenuItem_Click(object sender, EventArgs e)
@@ -487,28 +420,21 @@ namespace FileManager_1._0
             pasteClick();    
         }
         // // // REMOVE: // // //
-        private void removeSomeItem(string itemType, TreeView treeView, string filePath)
-        {
-            XmlDocument xml = new XmlDocument();
-            xml.Load(filePath);
-            var xPath = xPathFinding(treeView.SelectedNode, itemType);
-            var myNode = xml.SelectSingleNode(xPath);
-            myNode.ParentNode.RemoveChild(myNode);
-            xml.Save(filePath);
-        }
-        private void fileOrFolderRemove(Component removedItem, TreeView treeView, ListView listView, string filePath)
+        private void RemoveItem(Component removedItem, System.Windows.Forms.TreeView treeView, System.Windows.Forms.ListView listView, string filePath)
         {
             if (removedItem is Folder)
             {
-                removeSomeItem("", treeView, filePath);
+                HelperClass.RemoveFolderTxtFiles((Folder)removedItem, treeView.SelectedNode.FullPath); 
+                var xPath = HelperClass.xPathFinding(treeView.SelectedNode, "");
+                XmlHelper.RemoveFromXML(xPath, filePath);
                 TreeViewInitialization(filePath, treeView);
                 listView.Items.Clear();
             }
             else if (removedItem is File)
             {
-                var a = "Files\\" + nameFormFunc(treeView.SelectedNode.FullPath) + "_" + listView.SelectedItems[0].Text;
-                System.IO.File.Delete(a);
-                removeSomeItem("/document[@DOCUMENT = '" + listView.SelectedItems[0].Text + "']", treeView, filePath);
+                HelperClass.RemoveTxtFile(treeView.SelectedNode.FullPath, listView.SelectedItems[0].Text);
+                var xPath = HelperClass.xPathFinding(treeView.SelectedNode, "/document[@DOCUMENT = '" + listView.SelectedItems[0].Text + "']");
+                XmlHelper.RemoveFromXML(xPath, filePath);
                 listView.SelectedItems[0].Remove();
             }
         }
@@ -523,11 +449,11 @@ namespace FileManager_1._0
             removedItem = selectedItem.Item1;
             if (selectedItem.Item2 == "LEFT")
             {
-                fileOrFolderRemove(removedItem, treeViewLeft, listViewLeft, discCfilePath);
+                RemoveItem(removedItem, treeViewLeft, listViewLeft, discCfilePath);
             }
             else if (selectedItem.Item2 == "RIGHT")
             {
-                fileOrFolderRemove(removedItem, treeViewRight, listViewRight, discDfilePath);
+                RemoveItem(removedItem, treeViewRight, listViewRight, discDfilePath);
             }
         }
         private void removeToolStripMenuItem_Click(object sender, EventArgs e)
@@ -535,33 +461,14 @@ namespace FileManager_1._0
             removeClick();
         }
         // // // TextEditor-Part // // //
-        private string nameFormFunc(string _filePath)
-        {
-            string[] _splitedFilePath = _filePath.Split('\\');
-            string newName = string.Empty;
-            foreach(string item in _splitedFilePath)
-            {
-                newName += "_" + item.TrimEnd(':');
-            }
-            return newName.TrimStart('_');
-        }
-        private void listViewDoubleClick(ListView listView, TreeView treeView)
+        private void listViewDoubleClick(System.Windows.Forms.ListView listView, System.Windows.Forms.TreeView treeView)
         {
             if (treeView.SelectedNode == null)
             {
                 MessageBox.Show("Please, select folder with the desired file again");
                 return;
             }
-            string textFilePath = "Files\\" + nameFormFunc(treeView.SelectedNode.FullPath) + "_" + listView.SelectedItems[0].Text;
-            if (System.IO.File.Exists(textFilePath))
-                System.Diagnostics.Process.Start("TextEditor_1.0\\TextEditor_1.0\\bin\\Debug\\net6.0-windows\\TextEditor_1.0.exe", textFilePath);
-            else
-            {
-                System.IO.File.Create(textFilePath).Close();
-                System.Diagnostics.Process.Start("TextEditor_1.0\\TextEditor_1.0\\bin\\Debug\\net6.0-windows\\TextEditor_1.0.exe", textFilePath);
-            }
-            
-
+            HelperClass.OpenFileEditor(treeView.SelectedNode.FullPath, listView.SelectedItems[0].Text);
         }
         private void listViewLeft_MouseDoubleClick_1(object sender, MouseEventArgs e)
         {
@@ -572,41 +479,20 @@ namespace FileManager_1._0
             listViewDoubleClick(listViewRight, treeViewRight);
         }
         // // // Initializing my disks // // //
-
-        private void findAllTreeNodes(TreeNodeCollection Nodes)
+        private void InitializeAllFiles()
         {
-            foreach (TreeNode _node in Nodes)
-            {
-                Folder nodeTag = (Folder)_node.Tag;
-                var tagList = nodeTag.Get();
-                List<File> fileList = new List<File>();
-                foreach (var _tag in tagList)
-                {
-                    if (_tag is File)
-                    {
-                        fileList.Add((File)_tag);
-                    }
-                }
-                if (fileList.Count > 0)
-                {
-                    foreach (File _file in fileList)
-                    {
-                        System.IO.File.Create("Files\\" + nameFormFunc(_node.FullPath) +"_" +_file.Name).Close();
-                    }
-                }
-                findAllTreeNodes(_node.Nodes);
-            }
-        }
-        private void initializeToolStripMenuItem_Click(object sender, EventArgs e)
-        {
-            foreach(var file in System.IO.Directory.GetFiles("Files"))
+            foreach (var file in System.IO.Directory.GetFiles("Files"))
             {
                 System.IO.File.Delete(file);
             }
             System.IO.Directory.Delete("Files");
             System.IO.Directory.CreateDirectory("Files");
-            findAllTreeNodes(treeViewLeft.Nodes);
-            findAllTreeNodes(treeViewRight.Nodes);
+            HelperClass.FindAllTreeNodesAndCreateCorrespondingFiles(treeViewLeft.Nodes);
+            HelperClass.FindAllTreeNodesAndCreateCorrespondingFiles(treeViewRight.Nodes);
+        }
+        private void initializeToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            InitializeAllFiles();
         }
     }
 }
