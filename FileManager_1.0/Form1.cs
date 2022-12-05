@@ -295,50 +295,6 @@ namespace FileManager_1._0
         {
             List<Tuple<bool, string>> openFolder = new List<Tuple<bool, string>>();
             
-            foreach (TreeNode _node in Nodes)
-            {
-                if (_node.IsExpanded)
-                {
-                    openFolder.Add(Tuple.Create(true,_node.Text));
-                }
-                else
-                {
-                    openFolder.Add(Tuple.Create(false, _node.Text));
-                }
-                openFolder.AddRange(openFolderCheck(_node.Nodes));
-            }
-            return openFolder;
-        }
-        private void theSameNameCheck(TreeNode myNewHome, ListView listView)
-        {
-            if (copiedItem is Folder)
-            {
-                foreach (TreeNode _node in myNewHome.Nodes)
-                {
-                    if (_node.Text == copiedItem.Name)
-                    {
-                        copiedItem.Name += "-copied";
-                        theSameNameCheck(myNewHome, listView);
-                        break;
-                    }
-                }
-            }
-            else if (copiedItem is File)
-            {
-                foreach(ListViewItem _item in listView.Items)
-                {
-                    if (_item.Text== copiedItem.Name)
-                    {
-                        var splitedName = copiedItem.Name.Split('.');
-                        splitedName[0] = splitedName[0] + "-copied";
-                        copiedItem.Name = splitedName[0] + "." + splitedName[1];
-                        theSameNameCheck(myNewHome, listView);
-                        break;
-                    }
-                }
-            }
-        }
-
         // // // ComboBox functions // // //
         TreeView comboTreeView;
         ListView comboListView;
