@@ -1,207 +1,120 @@
-﻿using System;
+﻿using FileManager_1._0.FileActions.OpenFileClasses;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
 namespace FileManager_1._0
 {
     internal static class HelperClass
     {
-        public static string TheSameNameCheck(Folder myNewHome, string copiedItemName, Component copiedItemType)
+        public static void LoadFilesAndDirectories(TreeView treeView, ListView listView, string filePath)
         {
-            // Вирішую проблему повторюванних імен
-            if (copiedItemType is Folder)
+            DirectoryInfo fileList;
+            try
             {
-                foreach (Component _node in myNewHome.Get())
+                fileList = new DirectoryInfo(filePath);
+                FileInfo[] files = fileList.GetFiles();
+                DirectoryInfo[] dires = fileList.GetDirectories();
+
+                treeView.BeginUpdate();
+                treeView.Nodes.Clear();
+                foreach (DirectoryInfo dire in dires)
                 {
-                    if (_node.Name == copiedItemName)
+                    treeView.Nodes.Add(dire.Name);
+                }
+                treeView.EndUpdate();
+
+                listView.BeginUpdate();
+                listView.Items.Clear();
+                foreach (FileInfo file in files)
+                {
+                    listView.Items.Add(file.Name);
+                }
+                listView.EndUpdate();
+
+            }
+            catch (Exception e)
+            {
+                MessageBox.Show("loadFilesAndDirectories:: " + e.Message);
+                throw new Exception( "No such directory exists");
+            }
+
+        }
+        public static void CopyDirectory(string sourceDir, string destinationDir, bool recursive)
+        {
+            // Get information about the source directory
+            var dir = new DirectoryInfo(sourceDir);
+            var desDir = new DirectoryInfo(destinationDir);
+
+            // Check if the source directory exists
+            if (!dir.Exists)
+                throw new DirectoryNotFoundException($"Source directory not found: {dir.FullName}");
+
+            // Cache directories before we start copying
+            DirectoryInfo[] dirs = dir.GetDirectories();
+            // the same name check
+            if (desDir.Exists)
+            {
+                CopyDirectory(sourceDir, destinationDir + "-copied", recursive);
+                return;
+            }
+            // Create the destination directory
+            Directory.CreateDirectory(destinationDir);
+
+            // Get the files in the source directory and copy to the destination directory
+            foreach (FileInfo file in dir.GetFiles())
+            {
+                string targetFilePath = Path.Combine(destinationDir, file.Name);
+                file.CopyTo(targetFilePath);
+            }
+
+            // If recursive and copying subdirectories, recursively call this method
+            if (recursive)
+            {
+                foreach (DirectoryInfo subDir in dirs)
+                {
+                    string newDestinationDir = Path.Combine(destinationDir, subDir.Name);
+                    CopyDirectory(subDir.FullName, newDestinationDir, true);
+                }
+            }
+        }
+        private static void ClearSelection(ListView listView)
+        {
+            foreach (ListViewItem item in listView.Items)
+            {
+                item.Selected = false;
+            }
+        }
+        public static void SearchFunc(ListView listView, string searchedText)
+        {
+            // Шукаю у listView файлики, що містять в імені searchedText, і виділяю їх
+            ClearSelection(listView);
+            if (searchedText != string.Empty)
+            {
+                foreach (ListViewItem _item in listView.Items)
+                {
+                    Regex regex = new Regex(searchedText);
+                    var matches = regex.Matches(_item.Text);
+                    if (matches.Count > 0)
                     {
-                        copiedItemName += "-copied";
-                        copiedItemName = TheSameNameCheck(myNewHome, copiedItemName, copiedItemType);
+                        _item.Selected = true;
+                        listView.Focus();// = true;
                     }
-                }
-            }
-            else if (copiedItemType is File)
-            {
-                foreach (Component _item in myNewHome.Get())
-                {
-                    if (_item.Name == copiedItemName)
-                    {
-                        var splitedName = copiedItemName.Split('.');
-                        splitedName[0] = splitedName[0] + "-copied";
-                        copiedItemName = splitedName[0] + "." + splitedName[1];
-                        copiedItemName = TheSameNameCheck(myNewHome, copiedItemName, copiedItemType);
-                    }
-                }
-            }
-            return copiedItemName;
-        }
-        public static string xPathFinding(TreeNode myNode, string concreteItem)
-        {
-            // Динамічно формую xPath, через проблему повторюванних імен
-            if (myNode == null)
-            {
-                MessageBox.Show("ERROR_1:xPathFindingFunction");
-                return null;
-            }
-            string xPath = "/folder[@FOLDER = '" + myNode.Text + "']" + concreteItem;
-            while (myNode.Parent != null)
-            {
-                xPath = xPath.Insert(0, "/folder[@FOLDER = '" + myNode.Parent.Text + "']");
-                myNode = myNode.Parent;
-            }
-            xPath = xPath.Insert(0, "/dataBase");
-            return xPath;
-        }
-        public static string NewFileName(string _filePath)
-        {
-            // Формую ім'я до файлів, які зберігаю у провідничок
-            string[] _splitedFilePath = _filePath.Split('\\');
-            string newName = string.Empty;
-            foreach (string item in _splitedFilePath)
-            {
-                newName += "_" + item.TrimEnd(':');
-            }
-            return newName.TrimStart('_');
-        }
-        public static List<Tuple<bool, string>> OpenFolderCheck(TreeNodeCollection Nodes)
-        {
-            //Перевіряю, які ноди з Nodes відкриті, і формую відповідний список <відкритий? true:false, ім'я нода>
-            List<Tuple<bool, string>> openFolder = new List<Tuple<bool, string>>();
 
-            foreach (TreeNode _node in Nodes)
-            {
-                if (_node.IsExpanded)
-                {
-                    openFolder.Add(Tuple.Create(true, _node.Text));
-                }
-                else
-                {
-                    openFolder.Add(Tuple.Create(false, _node.Text));
-                }
-                openFolder.AddRange(OpenFolderCheck(_node.Nodes));
-            }
-            return openFolder;
-        }
-        public static int OpenOrCloseFolder(List<Tuple<bool, string>> openFolder, int folderIndex, TreeNodeCollection Nodes)
-        {
-            //Отримую інформацію з попередньої функції, та відкриваю/закриваю відповідні TreeViewNode-и
-            foreach (TreeNode _node in Nodes)
-            {
-                if (openFolder.Count - 1 < folderIndex)
-                    return 0;
-                if (openFolder[folderIndex].Item2 == _node.Text)
-                {
-                    if (openFolder[folderIndex].Item1)
-                        _node.Expand();
-                    else
-                        _node.Collapse();
-                    folderIndex = OpenOrCloseFolder(openFolder, ++folderIndex, _node.Nodes);
                 }
             }
-            return folderIndex;
-        }
-        public static void FindAndOpenTreeViewNode(TreeNodeCollection Nodes, string[] folderSequence, int currentFolderIndex, System.Windows.Forms.TreeView treeView)
-        {
-            // Відкриваю та тицяю у папку за даною послідовністю її батьків folderSequence
-            foreach (TreeNode _node in Nodes)
-            {
-                if (currentFolderIndex > folderSequence.Length - 1)
-                    return;
-                if (_node.Text == folderSequence[currentFolderIndex])
-                {
-                    _node.Expand();
-                    treeView.SelectedNode = _node;
-                    FindAndOpenTreeViewNode(_node.Nodes, folderSequence, ++currentFolderIndex, treeView);
-                }
-            }
-        }
-        public static void SelectListViewItem(string myNodeName, System.Windows.Forms.ListView listView)
-        {
-            // Вибираю елемент з іменем myNodeName у listView (якщо такий є)
-            int p = -1;
-            foreach (ListViewItem _item in listView.Items)
-            {
-                if (_item.Text == myNodeName)
-                    p = _item.Index;
-            }
-            if (p > -1)
-            {
-                listView.Items[p].Focused = true;
-                listView.Items[p].Selected = true;
-                listView.Items[p].EnsureVisible();
-                listView.Select();
-            }
-
-        }
-        public static void RemoveFolderTxtFiles(Component removedItem, string treeViewNodeFilePath)
-        {
-            // видаляє .тхт файли, які є у папці, що ми видалили у програмі
-            foreach (var item in ((Folder)removedItem).Get())
-            {
-                if (item is File)
-                {
-                    HelperClass.RemoveTxtFile(treeViewNodeFilePath, item.Name);
-                }
-                else if (item is Folder)
-                {
-                    RemoveFolderTxtFiles(item, treeViewNodeFilePath + "\\" + item.Name);
-                }
-            }
-        }
-        private static string TxtFileReference(string treeViewNodeFilePath, string listViewFileName)
-        {
-            return "Files\\" + HelperClass.NewFileName(treeViewNodeFilePath) + "_" + listViewFileName;
-        }
-        public static void RemoveTxtFile(string treeViewNodeFilePath, string listViewFileName)
-        {
-            // видаляє .тхт файл з listViewFileName ім'ям у самому менеджері,
-            // та з treeViewNodeFilePath посиланням на папку, в якій він знаходиться у менеджері
-            var a = TxtFileReference(treeViewNodeFilePath, listViewFileName);
-            System.IO.File.Delete(a);
-        }
-        public static void OpenFileEditor(string treeViewNodeFilePath, string listViewFileName)
-        {
-            // Програмно запускає мій едітор (ехе-шник якого знаходиться за textEditorExePath),
-            // та закидує туди шлях до файла, який йому потрібно відкрити
-
-            string textFilePath = TxtFileReference(treeViewNodeFilePath, listViewFileName);//"Files\\" + HelperClass.NewFileName(treeViewNodeFilePath) + "_" + listViewFileName;
-            const string textEditorExePath = "TextEditor_1.0\\TextEditor_1.0\\bin\\Debug\\net6.0-windows\\TextEditor_1.0.exe";
-
-            if (System.IO.File.Exists(textFilePath))
-                System.Diagnostics.Process.Start(textEditorExePath, textFilePath);
             else
-            {
-                System.IO.File.Create(textFilePath).Close();
-                System.Diagnostics.Process.Start(textEditorExePath, textFilePath);
-            }
-
-
+                MessageBox.Show("Fill in the text field");
         }
-        public static void FindAllTreeNodesAndCreateCorrespondingFiles(TreeNodeCollection Nodes)
+        public static string RemoveLastTag(string filePath)
         {
-            foreach (TreeNode _node in Nodes)
-            {
-                Folder nodeTag = (Folder)_node.Tag;
-                var tagList = nodeTag.Get();
-                List<File> fileList = new List<File>();
-                foreach (var _tag in tagList)
-                {
-                    if (_tag is File)
-                    {
-                        fileList.Add((File)_tag);
-                    }
-                }
-                if (fileList.Count > 0)
-                {
-                    foreach (File _file in fileList)
-                    {
-                        System.IO.File.Create(TxtFileReference(_node.FullPath, _file.Name)).Close();// "Files\\" + HelperClass.NewFileName(_node.FullPath) + "_" + _file.Name).Close();
-                    }
-                }
-                FindAllTreeNodesAndCreateCorrespondingFiles(_node.Nodes);
-            }
+            // Прибираю останній елемент в посиланні (C:\a\b\c\ -> C:\a\b\)
+            string[] filePathArr = filePath.Split("\\").Length > 2 ? filePath.Split("\\").SkipLast(2).ToArray() : new string[] { filePath.TrimEnd('\\') };
+            filePath = filePathArr.Length > 1 ? string.Join("\\", filePathArr) + "\\" : filePathArr[0] + "\\";
+            return filePath;
         }
     }
 }

@@ -10,7 +10,7 @@ namespace FileManager_1._0
     {
         public Component(string name)
         {
-            Name= name;
+            Name = name;
         }
         public string Name{ get; set; }
 
