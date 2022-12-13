@@ -46,9 +46,6 @@ namespace FileManager_1._0
         public FileManagerForm()
         {
             InitializeComponent();
-            //openButtonClick(treeViewLeft, listViewLeft, "LEFT");
-            //openButtonClick(treeViewRight, listViewRight, "RIGHT");
-            //updateFileManagerFunc();
         }
         // // // Open disk (with Dialog) // // //
         private void openButtonClick(TreeView treeView, ListView listView, string side)
