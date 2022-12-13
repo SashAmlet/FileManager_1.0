@@ -16,7 +16,7 @@ namespace FileManager_1._0.FileActions.OpenFileClasses
         }
         void IFile.startProcess()
         {
-            Process.Start(@"E:\Proga\C#\TextEditor_1.0\TextEditor_1.0\bin\Debug\net6.0-windows\TextEditor_1.0.exe", fullFilePath);
+            Process.Start(@"TextEditor\TextEditor_1.0.exe", fullFilePath);
         }
     }
 }

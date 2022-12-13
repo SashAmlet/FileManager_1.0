@@ -28,9 +28,9 @@ namespace FileManager_1._0
     public partial class FileManagerForm : Form
     {
         // // // Initialization part // // //
-        
-        private string _filePathLeft = "D:\\";
-        private string _filePathRight = "E:\\";
+
+        private string _filePathLeft;// = "D:\\";
+        private string _filePathRight;// = "E:\\";
         private string filePathLeft
         { 
             get { return _filePathLeft;}
@@ -46,7 +46,9 @@ namespace FileManager_1._0
         public FileManagerForm()
         {
             InitializeComponent();
-            updateFileManagerFunc();
+            //openButtonClick(treeViewLeft, listViewLeft, "LEFT");
+            //openButtonClick(treeViewRight, listViewRight, "RIGHT");
+            //updateFileManagerFunc();
         }
         // // // Open disk (with Dialog) // // //
         private void openButtonClick(TreeView treeView, ListView listView, string side)
@@ -55,10 +57,12 @@ namespace FileManager_1._0
             {
                 if (fbd.ShowDialog() == DialogResult.OK)
                 {
-                    filePathLeft = side == "LEFT"? fbd.SelectedPath:filePathLeft;
-                    filePathRight = side == "LEFT" ? filePathRight:fbd.SelectedPath;
+                    filePathLeft = side == "LEFT" ? fbd.SelectedPath : filePathLeft;
+                    filePathRight = side == "LEFT" ? filePathRight : fbd.SelectedPath;
                     comboBoxUpdate();
                 }
+                else
+                    return;
             }
             HelperClass.LoadFilesAndDirectories(treeView, listView, side == "LEFT" ? filePathLeft : filePathRight);
         }
@@ -73,8 +77,14 @@ namespace FileManager_1._0
         // // // Update File Manager // // // 
         void updateFileManagerFunc()
         {
-            HelperClass.LoadFilesAndDirectories(treeViewLeft, listViewLeft, filePathLeft);
-            HelperClass.LoadFilesAndDirectories(treeViewRight, listViewRight, filePathRight);
+            if (filePathLeft != null)
+            {
+                HelperClass.LoadFilesAndDirectories(treeViewLeft, listViewLeft, filePathLeft);
+            }
+            if (filePathRight != null)
+            {
+                HelperClass.LoadFilesAndDirectories(treeViewRight, listViewRight, filePathRight);
+            }
             comboBoxUpdate();
 
         }
@@ -82,6 +92,8 @@ namespace FileManager_1._0
         {
             try
             {
+                if (!filePathLeft[filePathLeft.Length - 1].Equals('\\'))
+                    filePathLeft += "\\";
                 filePathLeft += treeViewLeft.SelectedNode.Text + "\\";
                 updateFileManagerFunc();
             }
@@ -97,6 +109,8 @@ namespace FileManager_1._0
         {
             try
             {
+                if (!filePathRight[filePathRight.Length - 1].Equals('\\'))
+                    filePathRight += "\\";
                 filePathRight += treeViewRight.SelectedNode.Text + "\\";
                 updateFileManagerFunc();
             }
@@ -124,10 +138,16 @@ namespace FileManager_1._0
         // // // Combo box// // //
         private void comboBoxUpdate()
         {
-            comboBoxLeftLink.Text = filePathLeft;
-            comboBoxLeftLink.Items.Add(filePathLeft);
-            comboBoxRightLink.Text = filePathRight;
-            comboBoxRightLink.Items.Add(filePathRight);
+            if (filePathLeft != null)
+            {
+                comboBoxLeftLink.Text = filePathLeft;
+                comboBoxLeftLink.Items.Add(filePathLeft);
+            }
+            if (filePathRight != null)
+            {
+                comboBoxRightLink.Text = filePathRight;
+                comboBoxRightLink.Items.Add(filePathRight);
+            }
         }
         private void comboBoxClick( string comboBoxText, string _comboBox)
         {
@@ -174,15 +194,20 @@ namespace FileManager_1._0
         void Rebuild(string filePath)
         {
             //оновлюю дані на екрані, коли змінюють зміст папок через провідничок
-            UpdateFileManager updateFileManagerLeft = new(filePathLeft, this)
+            if (filePathLeft != null)
             {
-                _updateFileManager = updateFileManagerFunc
-            };
-
-            UpdateFileManager updateFileManagerRight = new(filePathRight, this)
+                UpdateFileManager updateFileManagerLeft = new(filePathLeft, this)
+                {
+                    _updateFileManager = updateFileManagerFunc
+                };
+            }
+            if (filePathRight != null)
             {
-                _updateFileManager = updateFileManagerFunc
-            };
+                UpdateFileManager updateFileManagerRight = new(filePathRight, this)
+                {
+                    _updateFileManager = updateFileManagerFunc
+                };
+            }
         }
         // // // Open file // // //
         private void OpenSomething(string side)
@@ -252,14 +277,8 @@ namespace FileManager_1._0
         }
         private void listViewLeft_Click(object sender, EventArgs e)
         {
-            try
-            {
-                if (listViewLeft.SelectedItems[0] != null)
-                    selectAllItems(listViewLeft, filePathLeft);
-                //copyItem.side = "LEFT";
-            }
-            catch { }
-
+            if (listViewLeft.SelectedItems[0] != null)
+                selectAllItems(listViewLeft, filePathLeft);
         }
         private void treeViewRight_MouseClick(object sender, EventArgs e)
         {
@@ -276,13 +295,8 @@ namespace FileManager_1._0
         }
         private void listViewRight_Click(object sender, EventArgs e)
         {
-            try
-            {
-                if (listViewRight.SelectedItems[0] != null)
-                    selectAllItems(listViewRight, filePathRight);
-                //copyItem.side = "RIGHT";
-            }
-            catch { }
+            if (listViewRight.SelectedItems[0] != null)
+                selectAllItems(listViewRight, filePathRight);
         }
         // // // Paste click // // //
         private void pasteClick()

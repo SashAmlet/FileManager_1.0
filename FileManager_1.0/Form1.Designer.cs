@@ -117,14 +117,14 @@
             // openLeftToolStripMenuItem
             // 
             this.openLeftToolStripMenuItem.Name = "openLeftToolStripMenuItem";
-            this.openLeftToolStripMenuItem.Size = new System.Drawing.Size(269, 44);
+            this.openLeftToolStripMenuItem.Size = new System.Drawing.Size(359, 44);
             this.openLeftToolStripMenuItem.Text = "Open Left";
             this.openLeftToolStripMenuItem.Click += new System.EventHandler(this.openLeftToolStripMenuItem_Click);
             // 
             // openRightToolStripMenuItem
             // 
             this.openRightToolStripMenuItem.Name = "openRightToolStripMenuItem";
-            this.openRightToolStripMenuItem.Size = new System.Drawing.Size(269, 44);
+            this.openRightToolStripMenuItem.Size = new System.Drawing.Size(359, 44);
             this.openRightToolStripMenuItem.Text = "Open Right";
             this.openRightToolStripMenuItem.Click += new System.EventHandler(this.openRightToolStripMenuItem_Click);
             // 
